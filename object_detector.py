@@ -79,16 +79,13 @@ class ObjectDetector:
             if area < self.contour_params['min_area'] or area > self.contour_params['max_area']:
                 continue
             
-            # Approximate the contour to a polygon
             epsilon = self.contour_params['epsilon_factor'] * cv2.arcLength(contour, True)
             approx = cv2.approxPolyDP(contour, epsilon, True)
             
-            # Check if it's a rectangle (4 vertices)
             if len(approx) == 4:
                 x, y, w, h = cv2.boundingRect(approx)
                 aspect_ratio = w / h
                 
-                # Filter based on aspect ratio to ensure it's roughly rectangular
                 if 0.3 <= aspect_ratio <= 3.0:
                     detected_rectangles.append({
                         'type': 'rectangle',
@@ -127,14 +124,21 @@ class ObjectDetector:
         Returns:
             BGR color tuple
         """
-        x, y = center
-        x1, y1 = max(0, x - radius), max(0, y - radius)
-        x2, y2 = min(frame.shape[1], x + radius), min(frame.shape[0], y + radius)
-        
-        roi = frame[y1:y2, x1:x2]
-        if roi.size == 0:
-            return (0, 0, 0)
-        
-        # Get the mean color of the ROI
-        mean_color = np.mean(roi, axis=(0, 1))
-        return tuple(map(int, mean_color)) 
+        try:
+            x, y = center
+            x1, y1 = max(0, x - radius), max(0, y - radius)
+            x2, y2 = min(frame.shape[1], x + radius), min(frame.shape[0], y + radius)
+            
+            roi = frame[y1:y2, x1:x2]
+            if roi.size == 0:
+                return (0, 0, 0)
+            
+            mean_color = np.mean(roi, axis=(0, 1))
+            b, g, r = mean_color
+            b = max(0, min(255, int(b)))
+            g = max(0, min(255, int(g)))
+            r = max(0, min(255, int(r)))
+            
+            return (b, g, r)
+        except (ValueError, TypeError, IndexError):
+            return (0, 0, 0) 

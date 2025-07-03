@@ -31,14 +31,25 @@ class TrackingVisualizer:
         if not isinstance(color, tuple) or len(color) != 3:
             return (0, 0, 0)
         
-        b, g, r = color
-        b = max(0, min(255, int(b)))
-        g = max(0, min(255, int(g)))
-        r = max(0, min(255, int(r)))
-        
-        return (b, g, r)
+        try:
+            b, g, r = color
+            b = max(0, min(255, int(b)))
+            g = max(0, min(255, int(g)))
+            r = max(0, min(255, int(r)))
+            
+            return (b, g, r)
+        except (ValueError, TypeError):
+            return (0, 0, 0)
     
-    def draw_tracks_on_frame(self, frame: np.ndarray, tracked_objects: List[TrackedObject], 
+    def _bgr_to_rgb(self, bgr_color: Tuple[int, int, int]) -> Tuple[float, float, float]:
+        """Convert BGR color to RGB for matplotlib (0-1 range)."""
+        try:
+            b, g, r = bgr_color
+            return (r / 255.0, g / 255.0, b / 255.0)
+        except (ValueError, TypeError):
+            return (0.0, 0.0, 0.0)
+    
+    def draw_tracks_on_frame(self, frame: np.ndarray, tracked_objects: List[TrackedObject],
                            show_history: bool = True, show_ids: bool = True) -> np.ndarray:
         """
         Draw tracking information on a frame.
@@ -65,20 +76,20 @@ class TrackingVisualizer:
                 continue
             
             if obj.object_type == 'circle':
-                cv2.circle(result_frame, current_pos, 25, color, 3)  # Larger circle, thicker line
+                cv2.circle(result_frame, current_pos, 25, color, 3)
             else:
                 x, y = current_pos
-                cv2.rectangle(result_frame, (x-20, y-20), (x+20, y+20), color, 3)  # Larger rectangle, thicker line
+                cv2.rectangle(result_frame, (x-20, y-20), (x+20, y+20), color, 3)
             
             if show_ids:
                 cv2.putText(result_frame, f"ID:{obj.object_id}", 
                            (current_pos[0] + 30, current_pos[1] - 15),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 3)  # Larger text, thicker
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 3)
             
             if show_history and len(obj.track_history) > 1:
                 points = [pos for _, pos in obj.track_history]
                 for i in range(1, len(points)):
-                    cv2.line(result_frame, points[i-1], points[i], color, 3)  # Thicker lines
+                    cv2.line(result_frame, points[i-1], points[i], color, 3)
         
         return result_frame
     
@@ -174,8 +185,9 @@ class TrackingVisualizer:
             if len(obj.track_history) > 1:
                 x_coords = [pos[0] for _, pos in obj.track_history]
                 y_coords = [pos[1] for _, pos in obj.track_history]
-                color = self.colors[obj.object_id % len(self.colors)]
-                ax4.plot(x_coords, y_coords, color=color, alpha=0.7, linewidth=2)
+                bgr_color = self.colors[obj.object_id % len(self.colors)]
+                rgb_color = self._bgr_to_rgb(bgr_color)
+                ax4.plot(x_coords, y_coords, color=rgb_color, alpha=0.7, linewidth=2)
         
         ax4.set_xlabel('X Coordinate')
         ax4.set_ylabel('Y Coordinate')
