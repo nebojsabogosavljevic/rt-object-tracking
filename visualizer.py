@@ -31,7 +31,6 @@ class TrackingVisualizer:
         if not isinstance(color, tuple) or len(color) != 3:
             return (0, 0, 0)
         
-        # Ensure all values are integers in valid range
         b, g, r = color
         b = max(0, min(255, int(b)))
         g = max(0, min(255, int(g)))
@@ -57,7 +56,7 @@ class TrackingVisualizer:
         
         for obj in tracked_objects:
             if obj.disappeared_frames > 0:
-                continue  # Skip objects that disappeared
+                continue 
             
             color = self._validate_color(self.colors[obj.object_id % len(self.colors)])
             current_pos = obj.get_last_position()
@@ -65,24 +64,21 @@ class TrackingVisualizer:
             if current_pos is None:
                 continue
             
-            # Draw current position
             if obj.object_type == 'circle':
-                cv2.circle(result_frame, current_pos, 20, color, 2)
-            else:  # rectangle
+                cv2.circle(result_frame, current_pos, 25, color, 3)  # Larger circle, thicker line
+            else:
                 x, y = current_pos
-                cv2.rectangle(result_frame, (x-15, y-15), (x+15, y+15), color, 2)
+                cv2.rectangle(result_frame, (x-20, y-20), (x+20, y+20), color, 3)  # Larger rectangle, thicker line
             
-            # Draw object ID
             if show_ids:
                 cv2.putText(result_frame, f"ID:{obj.object_id}", 
-                           (current_pos[0] + 25, current_pos[1] - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                           (current_pos[0] + 30, current_pos[1] - 15),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 3)  # Larger text, thicker
             
-            # Draw track history
             if show_history and len(obj.track_history) > 1:
                 points = [pos for _, pos in obj.track_history]
                 for i in range(1, len(points)):
-                    cv2.line(result_frame, points[i-1], points[i], color, 2)
+                    cv2.line(result_frame, points[i-1], points[i], color, 3)  # Thicker lines
         
         return result_frame
     
@@ -99,10 +95,8 @@ class TrackingVisualizer:
         Returns:
             Summary image showing all tracks
         """
-        # Create a blank canvas
         summary = np.ones((frame_height, frame_width, 3), dtype=np.uint8) * 255
         
-        # Draw each track
         for obj in tracked_objects:
             if len(obj.track_history) < 2:
                 continue
@@ -110,23 +104,17 @@ class TrackingVisualizer:
             color = self._validate_color(self.colors[obj.object_id % len(self.colors)])
             points = [pos for _, pos in obj.track_history]
             
-            # Draw track line
             for i in range(1, len(points)):
                 cv2.line(summary, points[i-1], points[i], color, 3)
             
-            # Draw start and end points
             if points:
-                # Start point (green circle)
                 cv2.circle(summary, points[0], 8, (0, 255, 0), -1)
-                # End point (red circle)
                 cv2.circle(summary, points[-1], 8, (0, 0, 255), -1)
                 
-                # Object ID
                 cv2.putText(summary, f"ID:{obj.object_id}", 
                            (points[-1][0] + 10, points[-1][1] - 10),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
         
-        # Add legend
         legend_y = 30
         cv2.putText(summary, "Tracking Summary", (10, legend_y), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
@@ -153,21 +141,17 @@ class TrackingVisualizer:
             print("No tracked objects to plot statistics for.")
             return
         
-        # Prepare data
         track_lengths = [obj.get_track_length() for obj in tracked_objects]
         object_types = [obj.object_type for obj in tracked_objects]
         
-        # Create subplots
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
         
-        # Track length distribution
         ax1.hist(track_lengths, bins=10, alpha=0.7, color='skyblue', edgecolor='black')
         ax1.set_xlabel('Track Length (frames)')
         ax1.set_ylabel('Number of Objects')
         ax1.set_title('Track Length Distribution')
         ax1.grid(True, alpha=0.3)
         
-        # Object type distribution
         type_counts = {}
         for obj_type in object_types:
             type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
@@ -178,7 +162,6 @@ class TrackingVisualizer:
         ax2.set_title('Object Type Distribution')
         ax2.grid(True, alpha=0.3)
         
-        # Track length vs object type
         circle_lengths = [obj.get_track_length() for obj in tracked_objects if obj.object_type == 'circle']
         rect_lengths = [obj.get_track_length() for obj in tracked_objects if obj.object_type == 'rectangle']
         
@@ -187,7 +170,6 @@ class TrackingVisualizer:
         ax3.set_title('Track Length by Object Type')
         ax3.grid(True, alpha=0.3)
         
-        # Object movement patterns (x vs y coordinates)
         for obj in tracked_objects:
             if len(obj.track_history) > 1:
                 x_coords = [pos[0] for _, pos in obj.track_history]
@@ -199,7 +181,7 @@ class TrackingVisualizer:
         ax4.set_ylabel('Y Coordinate')
         ax4.set_title('Object Movement Patterns')
         ax4.grid(True, alpha=0.3)
-        ax4.invert_yaxis()  # Invert Y axis to match image coordinates
+        ax4.invert_yaxis()
         
         plt.tight_layout()
         plt.show()
@@ -216,12 +198,10 @@ class TrackingVisualizer:
         """
         cap = cv2.VideoCapture(video_path)
         
-        # Get video properties
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
-        # Create video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
@@ -231,14 +211,89 @@ class TrackingVisualizer:
             if not ret:
                 break
             
-            # Get objects that were tracked in this frame
-            frame_objects = [obj for obj in tracked_objects 
-                           if any(frame_num == frame_number for frame_num, _ in obj.track_history)]
+            current_frame_objects = []
+            for obj in tracked_objects:
+                current_history = [(f, pos) for f, pos in obj.track_history if f <= frame_number]
+                
+                if current_history:
+                    class TempTrackedObject:
+                        def __init__(self, obj_id, obj_type, history, color):
+                            self.object_id = obj_id
+                            self.object_type = obj_type
+                            self.track_history = history
+                            self.color = color
+                            self.disappeared_frames = 0
+                        
+                        def get_last_position(self):
+                            if self.track_history:
+                                return self.track_history[-1][1]
+                            return None
+                    
+                    is_active = current_history and current_history[-1][0] == frame_number
+                    
+                    temp_obj = TempTrackedObject(
+                        obj.object_id,
+                        obj.object_type,
+                        current_history,
+                        obj.color
+                    )
+                    
+                    if not is_active:
+                        temp_obj.disappeared_frames = 1
+                    
+                    current_frame_objects.append(temp_obj)
             
-            # Draw tracking on frame
-            result_frame = self.draw_tracks_on_frame(frame, frame_objects)
+            result_frame = self.draw_tracks_on_frame(
+                frame, 
+                current_frame_objects, 
+                show_history=True, 
+                show_ids=True
+            )
             
-            # Write frame
+            out.write(result_frame)
+            frame_number += 1
+        
+        cap.release()
+        out.release()
+        print(f"Tracking video saved to: {output_path}")
+    
+    def save_tracking_video_with_history(self, video_path: str, output_path: str, 
+                                       frame_tracking_history: List[List]) -> None:
+        """
+        Create a video with tracking visualization using frame-by-frame tracking history.
+        
+        Args:
+            video_path: Path to input video
+            output_path: Path to save output video
+            frame_tracking_history: List of tracked objects for each frame
+        """
+        cap = cv2.VideoCapture(video_path)
+        
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        frame_number = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            if frame_number < len(frame_tracking_history):
+                current_frame_objects = frame_tracking_history[frame_number]
+            else:
+                current_frame_objects = []
+            
+            result_frame = self.draw_tracks_on_frame(
+                frame, 
+                current_frame_objects, 
+                show_history=True, 
+                show_ids=True
+            )
+            
             out.write(result_frame)
             frame_number += 1
         

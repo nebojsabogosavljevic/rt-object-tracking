@@ -37,15 +37,12 @@ class ObjectTrackingApp:
             output_dir: Directory to save output files
             show_preview: Whether to show real-time preview
         """
-        # Create output directory
         os.makedirs(output_dir, exist_ok=True)
         
-        # Open video
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {self.video_path}")
         
-        # Get video properties
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -53,8 +50,9 @@ class ObjectTrackingApp:
         
         print(f"Video properties: {frame_width}x{frame_height}, {fps} FPS, {total_frames} frames")
         
-        # Initialize visualizer with video dimensions
         self.visualizer = TrackingVisualizer(frame_width, frame_height)
+        
+        self.frame_tracking_history = []
         
         frame_number = 0
         print("Processing video frames...")
@@ -64,18 +62,36 @@ class ObjectTrackingApp:
             if not ret:
                 break
             
-            # Detect objects in current frame
             detections = self.detector.detect_objects(frame)
             
-            # Add color information to detections
             for detection in detections:
                 color = self.detector.get_object_color(frame, detection['center'])
                 detection['color'] = color
             
-            # Update tracker
             self.tracked_objects = self.tracker.update(detections, frame_number)
             
-            # Show preview if requested
+            frame_objects = []
+            for obj in self.tracked_objects:
+                frame_obj = type('FrameObject', (), {})()
+                frame_obj.object_id = obj.object_id
+                frame_obj.object_type = obj.object_type
+                
+                current_history = [(f, pos) for f, pos in obj.track_history if f <= frame_number]
+                frame_obj.track_history = current_history
+                
+                frame_obj.color = obj.color
+                frame_obj.disappeared_frames = obj.disappeared_frames
+                
+                def get_current_position(obj_history=current_history):
+                    if obj_history:
+                        return obj_history[-1][1]
+                    return None
+                
+                frame_obj.get_last_position = get_current_position
+                frame_objects.append(frame_obj)
+            
+            self.frame_tracking_history.append(frame_objects)
+            
             if show_preview:
                 result_frame = self.visualizer.draw_tracks_on_frame(frame, self.tracked_objects)
                 cv2.imshow('Object Tracking', result_frame)
@@ -83,8 +99,7 @@ class ObjectTrackingApp:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
             
-            # Progress update
-            if frame_number % 30 == 0:  # Update every 30 frames
+            if frame_number % 30 == 0:
                 progress = (frame_number / total_frames) * 100
                 print(f"Progress: {progress:.1f}% ({frame_number}/{total_frames})")
             
@@ -94,9 +109,9 @@ class ObjectTrackingApp:
         if show_preview:
             cv2.destroyAllWindows()
         
+        self.tracked_objects = self.tracker.get_all_tracks()
         print(f"Processing complete. Tracked {len(self.tracked_objects)} objects.")
         
-        # Generate outputs
         self._generate_outputs(output_dir)
     
     def _generate_outputs(self, output_dir: str) -> None:
@@ -108,7 +123,6 @@ class ObjectTrackingApp:
         """
         print("Generating output visualizations...")
         
-        # Create tracking summary image
         summary_image = self.visualizer.create_tracking_summary(
             self.tracked_objects, 
             self.visualizer.frame_width, 
@@ -119,14 +133,11 @@ class ObjectTrackingApp:
         cv2.imwrite(summary_path, summary_image)
         print(f"Tracking summary saved to: {summary_path}")
         
-        # Create tracking video
         video_output_path = os.path.join(output_dir, "tracking_result.mp4")
-        self.visualizer.save_tracking_video(self.video_path, video_output_path, self.tracked_objects)
+        self.visualizer.save_tracking_video_with_history(self.video_path, video_output_path, self.frame_tracking_history)
         
-        # Generate statistics
         self.visualizer.plot_track_statistics(self.tracked_objects)
         
-        # Save tracking data
         self._save_tracking_data(output_dir)
     
     def _save_tracking_data(self, output_dir: str) -> None:
@@ -187,17 +198,14 @@ def main():
     
     args = parser.parse_args()
     
-    # Check if video file exists
     if not os.path.exists(args.video_path):
         print(f"Error: Video file '{args.video_path}' not found.")
         return
     
     try:
-        # Create and run the tracking application
         app = ObjectTrackingApp(args.video_path)
         app.process_video(output_dir=args.output, show_preview=args.preview)
         
-        # Show statistics if requested
         if args.stats:
             stats = app.get_tracking_statistics()
             print("\nTracking Statistics:")

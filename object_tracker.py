@@ -92,11 +92,9 @@ class ObjectTracker:
         Returns:
             List of currently tracked objects
         """
-        # Mark all objects as missing initially
         for obj in self.tracked_objects:
             obj.mark_missing(frame_number)
         
-        # Try to match detections with existing tracked objects
         matched_detection_indices = set()
         available_objects = [obj for obj in self.tracked_objects 
                            if obj.disappeared_frames <= self.max_disappeared_frames]
@@ -113,14 +111,12 @@ class ObjectTracker:
                 matched_detection_indices.add(i)
                 available_objects.remove(best_match)
         
-        # Create new tracked objects for unmatched detections
         for i, detection in enumerate(detections):
             if i not in matched_detection_indices:
                 new_object = TrackedObject(self.next_object_id, detection, frame_number)
                 self.tracked_objects.append(new_object)
                 self.next_object_id += 1
         
-        # Remove objects that have been missing for too long
         self.tracked_objects = [obj for obj in self.tracked_objects 
                               if obj.disappeared_frames <= self.max_disappeared_frames]
         
